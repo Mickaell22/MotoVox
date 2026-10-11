@@ -47,7 +47,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _requestPermissions() async {
-    await [Permission.microphone, Permission.camera].request();
+    // notification: Android 13+ la necesita para mostrar la llamada activa.
+    await [Permission.microphone, Permission.camera, Permission.notification]
+        .request();
   }
 
   void _goToCreate() {

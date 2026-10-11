@@ -26,7 +26,7 @@ class _ConnectedScreenState extends State<ConnectedScreen> {
       if (mounted) setState(() => _connected = state);
     });
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() => _secs++);
+      if (mounted && _connected) setState(() => _secs++);
     });
   }
 
@@ -56,6 +56,11 @@ class _ConnectedScreenState extends State<ConnectedScreen> {
   @override
   Widget build(BuildContext context) {
     final active = _connected && !_muted;
+    final (pillLabel, pillColor) = !_connected
+        ? ('Reconectando...', AppColors.orange)
+        : _muted
+            ? ('Silenciado', AppColors.red)
+            : ('Conectado', AppColors.green);
 
     return Scaffold(
       appBar: const MvAppBar(title: 'MotoVox'),
@@ -69,10 +74,7 @@ class _ConnectedScreenState extends State<ConnectedScreen> {
 
               // Status pill
               Center(
-                child: StatusPill(
-                  label: _muted ? 'Silenciado' : 'Conectado',
-                  color: _muted ? AppColors.red : AppColors.green,
-                ),
+                child: StatusPill(label: pillLabel, color: pillColor),
               ),
 
               // Hero
@@ -132,7 +134,11 @@ class _ConnectedScreenState extends State<ConnectedScreen> {
                           fontWeight: FontWeight.w700,
                         ),
                         child: Text(
-                          _muted ? 'MICRÓFONO SILENCIADO' : 'SIN PUSH-TO-TALK',
+                          !_connected
+                              ? 'SEÑAL PERDIDA'
+                              : _muted
+                                  ? 'MICRÓFONO SILENCIADO'
+                                  : 'SIN PUSH-TO-TALK',
                         ),
                       ),
                     ],

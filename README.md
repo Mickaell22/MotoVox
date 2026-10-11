@@ -16,7 +16,7 @@ Intercomunicador para moto en tiempo real. Conecta conductor y copiloto por audi
 1. Un teléfono crea el **hotspot** WiFi y el otro se conecta — no hace falta internet
 2. El **host** abre una sala: escucha en un puerto TCP y la anuncia por broadcast UDP cada 2 s
 3. El **cliente** ve la sala en una lista y toca para conectarse (el QR queda como respaldo)
-4. El audio viaja como PCM16 por el socket TCP, con `tcpNoDelay` para no acumular latencia
+4. El audio viaja como PCM16 por el socket TCP, con `tcpNoDelay` y una cola de reproducción con tope de 200 ms para que la latencia no crezca
 5. RNNoise filtra el ruido de fondo (viento, motor) antes de enviarlo
 
 ---
@@ -27,6 +27,8 @@ Intercomunicador para moto en tiempo real. Conecta conductor y copiloto por audi
 - **Descubrimiento automático de salas** — broadcast UDP, sin tipear IPs
 - **Conexión vía QR** — respaldo cuando el broadcast no llega
 - **Reducción de ruido** — RNNoise (C nativo compilado para ARM64 vía FFI)
+- **Reconexión automática** — si se corta la señal, el copiloto reintenta solo y la pantalla muestra "Reconectando..."
+- **Funciona con la pantalla apagada** — foreground service con notificación de llamada activa
 - **Salas simultáneas** — puertos TCP dinámicos, cada sala independiente
 - **Test de micrófono** — pantalla dedicada para verificar audio
 - **Sistema de licencias** — estados: desbloqueado / prueba / vencida
@@ -40,7 +42,7 @@ Intercomunicador para moto en tiempo real. Conecta conductor y copiloto por audi
 |------|-----------|
 | Framework | Flutter (Dart) |
 | Plataforma | Android (ARM64) |
-| Audio | `flutter_sound` — PCM16, 16 kHz, mono |
+| Audio | `flutter_sound` — PCM16, 48 kHz (frecuencia nativa de RNNoise), mono |
 | Reducción de ruido | RNNoise (C nativo compilado con el NDK, llamado por `dart:ffi`) |
 | Transporte de audio | Sockets TCP (`dart:io`), puerto dinámico, `tcpNoDelay` |
 | Descubrimiento de sala | Broadcast UDP en el puerto 8767 + `network_info_plus` |
@@ -59,9 +61,15 @@ Intercomunicador para moto en tiempo real. Conecta conductor y copiloto por audi
 ```bash
 git clone https://github.com/Mickaell22/MotoVox.git
 cd MotoVox
+cp lib/config.dart.example lib/config.dart   # definir el código de administrador
 flutter pub get
 flutter run
 ```
+
+Para firmar el release con una keystore propia, copiar `android/key.properties.example` a
+`android/key.properties` y completarlo (ambos archivos de secretos están ignorados en Git). Sin él,
+el release se firma con la debug key. Ojo: al cambiar de firma, las instalaciones existentes se
+tienen que desinstalar antes de instalar la nueva versión.
 
 Requiere Android SDK y dispositivo con API 21+. Para probar el intercomunicador hacen falta
 **dos teléfonos** en la misma red WiFi (o uno haciendo de hotspot): el emulador no sirve porque

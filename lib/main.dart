@@ -29,9 +29,8 @@ class MotoVoxApp extends StatelessWidget {
     return MaterialApp(
       title: 'MotoVox',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.light,
-      darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.system,
+      // Solo oscuro: las pantallas usan colores fijos pensados para fondo negro.
+      theme: AppTheme.dark,
       home: startExpired ? const ExpiredScreen() : const HomeScreen(),
     );
   }

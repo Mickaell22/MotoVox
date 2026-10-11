@@ -3,6 +3,28 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+/// IP local preferida: la subred de hotspot Android (192.168.43.x) primero,
+/// después cualquier red privada.
+Future<String?> localIp() async {
+  try {
+    final interfaces = await NetworkInterface.list(
+      type: InternetAddressType.IPv4,
+      includeLoopback: false,
+    );
+    String? fallback;
+    for (final iface in interfaces) {
+      for (final addr in iface.addresses) {
+        final ip = addr.address;
+        if (ip.startsWith('192.168.43.')) return ip;
+        if (ip.startsWith('192.168.') || ip.startsWith('10.')) fallback = ip;
+      }
+    }
+    return fallback;
+  } catch (_) {
+    return null;
+  }
+}
+
 class RoomInfo {
   final String id;
   final String name;
@@ -83,7 +105,8 @@ class RoomDiscoveryService {
           final room = RoomInfo(
             id: payload['id'] as String,
             name: payload['name'] as String,
-            ip: payload['ip'] as String,
+            // IP real del emisor: la del payload puede ser de otra interfaz.
+            ip: dg.address.address,
             port: payload['port'] as int,
             lastSeen: DateTime.now(),
           );

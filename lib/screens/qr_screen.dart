@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -42,31 +41,11 @@ class _QrScreenState extends State<QrScreen>
     if (widget.isHost) _startHost();
   }
 
-  Future<String?> _getLocalIp() async {
-    try {
-      final interfaces = await NetworkInterface.list(
-        type: InternetAddressType.IPv4,
-        includeLoopback: false,
-      );
-      String? fallback;
-      for (final iface in interfaces) {
-        for (final addr in iface.addresses) {
-          final ip = addr.address;
-          if (ip.startsWith('192.168.43.')) return ip;
-          if (ip.startsWith('192.168.') || ip.startsWith('10.')) fallback = ip;
-        }
-      }
-      return fallback;
-    } catch (_) {
-      return null;
-    }
-  }
-
   Future<void> _startHost() async {
     try {
       setState(() => _statusMsg = 'Buscando red...');
 
-      final ip = await _getLocalIp();
+      final ip = await localIp();
       if (ip == null) {
         setState(() => _statusMsg =
             'Sin red WiFi o hotspot.\nActiva el hotspot e intenta de nuevo.');
@@ -119,9 +98,10 @@ class _QrScreenState extends State<QrScreen>
       return;
     }
 
-    final ip = payload['ip'] as String?;
-    final port = payload['port'] as int?;
-    if (ip == null || port == null) return;
+    // QR ajeno a MotoVox: se ignora en vez de lanzar por tipos inesperados.
+    final ip = payload['ip'];
+    final port = payload['port'];
+    if (ip is! String || port is! int) return;
 
     setState(() {
       _scanned = true;
@@ -147,6 +127,8 @@ class _QrScreenState extends State<QrScreen>
         _audioService = null;
       }
     } catch (e) {
+      await _audioService?.dispose();
+      _audioService = null;
       if (!mounted) return;
       setState(() {
         _scanned = false;

@@ -62,7 +62,7 @@ ANDROID_HOME=/home/mickaell/Android/Sdk /opt/flutter/bin/flutter clean
 
 ## Dependencias actuales (pubspec.yaml)
 ```yaml
-version: 1.2.0+3
+version: 1.3.0+4
 
 dependencies:
   flutter_sound: ^9.2.0          # resuelve a 9.30.0
@@ -89,13 +89,16 @@ Teléfono A (host/piloto)          Teléfono B (cliente/copiloto)
 
 ### AudioRelayService (lib/services/audio_relay_service.dart)
 - Puerto TCP: **dinámico** — el SO asigna uno libre con `bind(0)`. `actualPort` expone el puerto asignado.
-- Formato: PCM16, 16000 Hz, mono
+- Formato: PCM16, **48000 Hz**, mono. RNNoise solo funciona a 48 kHz (480 muestras = 10 ms); a 16 kHz ve la voz con el espectro deformado y la suprime. No bajar la frecuencia sin agregar un resampler.
 - Graba con `FlutterSoundRecorder` → stream `Uint8List` → **RnnoiseProcessor** → envía por socket
-- Recibe datos del socket → `_player.uint8ListSink`
+- Recibe datos del socket → `PlaybackQueue` (tope 200 ms) → `_player.feedUint8FromStream` con backpressure. **No usar `uint8ListSink`**: encola en un `StreamController` sin límite y la latencia crece sin techo durante la llamada. `PlaybackQueue` también realinea a muestras PCM16 porque TCP puede partir un chunk en un byte impar. Test en `test/playback_queue_test.dart`.
+- **Detección de caída**: watchdog de 3 s sin datos recibidos → desconexión. Funciona porque siempre fluye audio: **silenciar manda ceros, no pausa el recorder** (si pausara, el otro lado lo tomaría como caída).
+- **Reconexión automática** (solo cliente): tras una caída reintenta `ip:puerto` cada 2 s hasta reconectar o `dispose()`. `connectionState` emite `false`/`true` y `ConnectedScreen` muestra "Reconectando...". `_stopAudio()` guarda su future en `_stopping` y `_startAudio` lo espera, para no arrancar el recorder mientras el anterior todavía se detiene.
+- **Foreground service** (`CallService.kt`, tipo `microphone`): `init()` lo arranca y `dispose()` lo detiene por el MethodChannel `com.motovox.motovox/app`. Sin él, Android 9+ corta el micrófono con la pantalla apagada (el caso normal en la moto). Retiene un wakelock parcial y un WiFi lock. Tiene que arrancarse con la app en primer plano y con el permiso de micrófono ya concedido (Android 14+); si falla, la llamada sigue con la pantalla encendida.
 - `AudioSource.voice_communication` — activa AEC hardware de Android
 - El host acepta UNA sola conexión (scope 1-a-1); una segunda se destruye. Al desconectarse se libera el slot y se detienen recorder y player, lo que permite reconexión limpia del mismo copiloto.
 - `connectToHost` exige `port` explícito (los puertos son dinámicos; no hay default válido)
-- `enableVoiceProcessing`, `enableNoiseSuppression`, `enableEchoCancellation: true`
+- `enableEchoCancellation: true`; `enableVoiceProcessing` y `enableNoiseSuppression` en `false` (RNNoise hace la supresión; apilar dos supresores degrada la voz)
 - **Filtro de voz: RNNoise** — reemplazó el filtro biquad bandpass. Supresión ML que distingue voz de otros sonidos.
 
 ### RnnoiseProcessor (lib/services/rnnoise_processor.dart)
@@ -105,10 +108,10 @@ Teléfono A (host/piloto)          Teléfono B (cliente/copiloto)
 - **Fallback sin .so**: si `RnnoiseFfi.init()` falló (librnnoise.so no carga), `process()` devuelve el input tal cual (passthrough). Sin este guard, `processFrame()` lanzaría `LateInitializationError` en cada frame en release y la llamada quedaría muda.
 - Conversión PCM16 LE ↔ float32 en rango nativo [-32768, 32767] (sin normalizar — requerido por RNNoise)
 - Acceso a buffers FFI con `(pointer + i).value` (API actual de dart:ffi, sin `elementAt` deprecado)
-- **No usar en AudioTestService**: el audio pre-procesado por hardware (AEC/NS) confunde al estimador de ruido de RNNoise → lo silencia después del primer segundo.
+- **No usar en AudioTestService**: el test graba a 16 kHz con NS de hardware para mostrar la calidad del micrófono, y RNNoise exige 48 kHz.
 
 ### AudioTestService (lib/services/audio_test_service.dart)
-- Graba 5 segundos a archivo WAV temporal con la misma configuración que la llamada real
+- Graba 5 segundos a archivo WAV temporal (16 kHz, con AEC/NS de hardware; la llamada real va a 48 kHz con RNNoise)
 - Reproduce el archivo inmediatamente después para que el usuario oiga cómo suena
 - **No aplica RNNoise** — el test muestra la calidad del hardware (AEC/NS), que ya es suficiente para evaluar el micrófono
 - Estados: `idle → recording → playing → done`
@@ -122,13 +125,13 @@ Teléfono A (host/piloto)          Teléfono B (cliente/copiloto)
 
 ## Estado actual (2026-05-05) ✓
 - **Conexión y transmisión de voz funcionando** — 2 teléfonos por hotspot, sin internet
-- **Supresión de ruido activa** — `AudioSource.voice_communication` + flags de AEC/NS + RNNoise ML
+- **Supresión de ruido activa** — `AudioSource.voice_communication` + AEC de hardware + RNNoise ML
 - **Descubrimiento automático de salas** — UDP broadcast; el copiloto ve la sala en lista sin escanear QR
 - **Múltiples salas simultáneas** — puertos TCP dinámicos, cada sala independiente
 - **QR como fallback** — sigue disponible en la pantalla del host
 - **Test de audio** — graba 5 segundos y reproduce (acceso en Configuración → Audio)
 - `NetworkInterface.list()` prioriza `192.168.43.x` (subred de hotspot Android)
-- **Versión 1.2.0+3** — `package_info_plus` lee la versión dinámica en Configuración → Acerca de
+- **Versión 1.3.0+4** — `package_info_plus` lee la versión dinámica en Configuración → Acerca de
 - **Rediseño visual completo** — implementado desde prototipo hi-fi:
   - Tokens: bg `#0A0A0A`, surface `#141414`, card `#1C1C1C`, border `#282828`
   - `lib/widgets/mv_widgets.dart` — componentes compartidos: `MvAppBar`, `StatusPill`, `PrimaryBtn`, `OutlineBtn`, `SignalBars`, `HelmetWidget`, `PulseRings`, `AudioBarsWidget`
@@ -142,15 +145,18 @@ Teléfono A (host/piloto)          Teléfono B (cliente/copiloto)
 ## Pendiente
 - **Probar RNNoise en llamada real** — pendiente de tener segundo teléfono para probar audio entre dispositivos
 - Probar calidad de audio en condiciones reales (moto en movimiento)
-- Latencia — no medida todavía
+- **Probar en hardware la versión 1.3.0**: 48 kHz + RNNoise (¿suena bien la voz o conviene reactivar el NS de hardware?), pantalla apagada con el foreground service, y reconexión al alejarse y volver
+- Audio Bluetooth (casco): no hay ruteo SCO; Android puede mandar la salida por A2DP y tomar el micrófono del teléfono. Requiere probar con un casco real antes de tocarlo
+- Latencia de punta a punta — no medida (la cola tiene tope de 200 ms, más el buffer de AudioTrack)
 - Prueba de estabilidad conexión larga duración
+- Licencia: `adminCode` va compilado en el APK (se extrae con `strings`) y borrar los datos de la app reinicia la prueba. Atrasar el reloj ya no sirve (`_now()` guarda la última fecha vista). Arreglarlo del todo exige un servidor
 - Nombre de sala personalizable (actualmente "MotoVox" fijo)
 
 ## Roadmap: RNNoise (supresión de ruido ML)
 
 RNNoise es una red neuronal recurrente (GRU) de Mozilla, ~100 KB, diseñada para separar
 voz humana de cualquier otro sonido en tiempo real. Es lo que usan Discord, Zoom y similares.
-Funciona en frames de **480 muestras** (30 ms a 16 kHz).
+Funciona en frames de **480 muestras** (10 ms a **48 kHz**; esa es la única frecuencia que soporta).
 
 ### Fase 1 — Compilar librnnoise.so para ARM64 ✓ COMPLETADA
 **Resultado**: `lib/arm64-v8a/librnnoise.so` (5.75 MB) incluido en el APK.
@@ -190,7 +196,10 @@ Funciona en frames de **480 muestras** (30 ms a 16 kHz).
 - **Scope inicial**: solo piloto + copiloto (1 a 1)
 - **flutter_webrtc eliminado** del proyecto — `webrtc_service.dart` y `signaling_service.dart` borrados
 - **RNNoise vía dart:ffi** — elegido sobre plugins Flutter inexistentes; compila como `.so` con NDK y se llama directamente desde Dart sin overhead de platform channels
-- **RNNoise no aplicar a audio pre-procesado por hardware** — el modelo GRU silencia la voz después del primer segundo cuando recibe audio ya filtrado por AEC/NS del SO. Aplicar solo al stream raw del micrófono en la llamada real.
+- **RNNoise a 48 kHz** — se creía que RNNoise silenciaba la voz porque le llegaba audio ya procesado por AEC/NS del hardware. La causa real era la frecuencia: se le pasaba audio a 16 kHz y el modelo está entrenado a 48 kHz. Desde 1.3.0 la llamada va a 48 kHz.
+- **Solo tema oscuro** — las pantallas usan colores fijos (`Colors.white`, `AppColors.white40`) pensados para fondo negro; con `ThemeMode.system` el texto quedaba invisible en modo claro. El tema claro se eliminó.
+- **Firma de release** — `android/key.properties` (ignorado en Git; plantilla en `key.properties.example`). Sin ese archivo se firma con la debug key. Cambiar de firma obliga a desinstalar las instalaciones existentes.
+- **IP de sala** — el cliente usa la IP de origen del datagrama UDP (`dg.address`), no la del payload, que podía venir de otra interfaz del host.
 - **Versioning**: MINOR por feature nueva, PATCH por bug fix. `package_info_plus` lee la versión dinámica.
 
 ## Hardware futuro

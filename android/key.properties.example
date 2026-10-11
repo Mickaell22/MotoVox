@@ -1,0 +1,6 @@
+# Copiar a android/key.properties (ignorado en Git) y completar.
+# storeFile es relativo a android/app/ o una ruta absoluta.
+storeFile=
+storePassword=
+keyAlias=
+keyPassword=

@@ -40,8 +40,13 @@ class _RoomsScreenState extends State<RoomsScreen> {
     setState(() => _connectingId = room.id);
 
     final audio = AudioRelayService();
-    await audio.init();
-    final ok = await audio.connectToHost(room.ip, port: room.port);
+    bool ok;
+    try {
+      await audio.init();
+      ok = await audio.connectToHost(room.ip, port: room.port);
+    } catch (_) {
+      ok = false; // sin esto _connectingId queda trabado y nada es tocable
+    }
 
     if (!mounted) return;
 

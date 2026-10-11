@@ -18,11 +18,6 @@ class AppColors {
   static const green = Color(0xFF00E676);
   static const red = Color(0xFFFF5252);
   static const redDim = Color(0x26FF5252);
-
-  // Tema claro (exterior / sol directo)
-  static const lightBg = Color(0xFFF5F5F5);
-  static const lightSurface = Color(0xFFFFFFFF);
-  static const lightCard = Color(0xFFEEEEEE);
 }
 
 class AppTheme {
@@ -103,69 +98,6 @@ class AppTheme {
             borderSide: const BorderSide(color: AppColors.orange, width: 1.5),
           ),
           hintStyle: const TextStyle(color: AppColors.white40),
-        ),
-        useMaterial3: true,
-      );
-
-  // Tema claro — alto contraste para uso en exterior con sol directo
-  static ThemeData get light => ThemeData(
-        brightness: Brightness.light,
-        scaffoldBackgroundColor: AppColors.lightBg,
-        colorScheme: const ColorScheme.light(
-          primary: AppColors.orangeDark,
-          secondary: AppColors.orangeDark,
-          surface: AppColors.lightSurface,
-          onPrimary: Colors.white,
-          onSurface: Colors.black,
-        ),
-        cardColor: AppColors.lightCard,
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.orangeDark,
-            foregroundColor: Colors.white,
-            minimumSize: const Size(double.infinity, 56),
-            textStyle: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.8,
-            ),
-            shape: const RoundedRectangleBorder(
-              borderRadius: BorderRadius.all(Radius.circular(14)),
-            ),
-          ),
-        ),
-        outlinedButtonTheme: OutlinedButtonThemeData(
-          style: OutlinedButton.styleFrom(
-            foregroundColor: AppColors.orangeDark,
-            side: const BorderSide(color: AppColors.orangeDark, width: 2),
-            minimumSize: const Size(double.infinity, 56),
-            textStyle: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.8,
-            ),
-            shape: const RoundedRectangleBorder(
-              borderRadius: BorderRadius.all(Radius.circular(14)),
-            ),
-          ),
-        ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: AppColors.lightSurface,
-          foregroundColor: Colors.black,
-          elevation: 0,
-          centerTitle: true,
-          titleTextStyle: TextStyle(
-            color: Colors.black,
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 2.5,
-          ),
-        ),
-        textTheme: const TextTheme(
-          displayLarge:
-              TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-          bodyLarge: TextStyle(color: Colors.black87, fontSize: 16),
-          bodyMedium: TextStyle(color: Colors.black54, fontSize: 14),
         ),
         useMaterial3: true,
       );

@@ -12,7 +12,7 @@ typedef _ProcessC = Float Function(Pointer<Void>, Pointer<Float>, Pointer<Float>
 /// Wrapper liviano sobre librnnoise.so.
 /// Un solo estado por instancia; no es thread-safe — usar desde un único isolate.
 class RnnoiseFfi {
-  // 480 muestras × 30 ms a 16 kHz (constante fija del modelo).
+  // 480 muestras = 10 ms a 48 kHz (constante fija del modelo; exige audio a 48 kHz).
   static const int frameSize = 480;
 
   late final Pointer<Void> Function(Pointer<Void>)                           _create;
