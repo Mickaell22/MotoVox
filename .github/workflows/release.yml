@@ -1,0 +1,77 @@
+# APK firmado al subir un tag vX.Y.Z:
+#   motovox-arm64-v8a.apk  -> instalar en el telefono (Android 64 bits)
+# Solo arm64: RNNoise se compila unicamente para arm64-v8a (abiFilters en
+# android/app/build.gradle.kts). El nombre no lleva version para que
+# releases/latest/download/motovox-arm64-v8a.apk no se rompa.
+#
+# Las notas del release salen del mensaje del tag anotado:
+#   git tag -a v1.3.0 -m "notas..." && git push origin v1.3.0
+#
+# Secrets del repo (Settings > Secrets and variables > Actions):
+#   MOTOVOX_KEYSTORE_B64       base64 del .jks de release
+#   MOTOVOX_KEYSTORE_PASSWORD  contraseña del keystore (y de la llave)
+#   MOTOVOX_ADMIN_CODE         codigo de administrador -> lib/config.dart
+# Siempre la MISMA llave: un APK firmado con otra no instala encima del anterior.
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+env:
+  FLUTTER_VERSION: '3.41.9'
+  # SHA-256 del certificado de la llave de release (publico, no es secreto).
+  # Si el APK sale firmado con otra llave, no se publica.
+  CERT_SHA256: '975468f92a9c984ced340711ecedd7cf569290ef17874a3470684cc84b8bc5d4'
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: El tag coincide con la version del pubspec
+        run: |
+          v=$(grep -m1 '^version:' pubspec.yaml | sed 's/version: *//; s/+.*//')
+          [ "v$v" = "$GITHUB_REF_NAME" ] || { echo "tag $GITHUB_REF_NAME != pubspec $v"; exit 1; }
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+      - name: Llave de firma
+        env:
+          KEYSTORE_B64: ${{ secrets.MOTOVOX_KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.MOTOVOX_KEYSTORE_PASSWORD }}
+        run: |
+          [ -n "$KEYSTORE_B64" ] || { echo "falta el secret MOTOVOX_KEYSTORE_B64"; exit 1; }
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          printf 'storeFile=%s\nstorePassword=%s\nkeyAlias=motovox\nkeyPassword=%s\n' \
+            "$RUNNER_TEMP/release.jks" "$KEYSTORE_PASSWORD" "$KEYSTORE_PASSWORD" > android/key.properties
+      - name: lib/config.dart (ignorado en Git)
+        env:
+          ADMIN_CODE: ${{ secrets.MOTOVOX_ADMIN_CODE }}
+        run: |
+          [ -n "$ADMIN_CODE" ] || { echo "falta el secret MOTOVOX_ADMIN_CODE"; exit 1; }
+          python3 -c 'import json,os; print("const String adminCode = %s;" % json.dumps(os.environ["ADMIN_CODE"]).replace("$", "\\$"))' > lib/config.dart
+      - run: flutter pub get
+      - run: flutter test
+      - run: flutter build apk --release --target-platform android-arm64
+      - name: Firmado con la llave de release
+        run: |
+          signer=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$signer" verify --print-certs build/app/outputs/flutter-apk/app-release.apk \
+            | grep -q "SHA-256 digest: $CERT_SHA256" || { echo "el APK no esta firmado con la llave de release"; exit 1; }
+      - name: Publicar
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp build/app/outputs/flutter-apk/app-release.apk motovox-arm64-v8a.apk
+          sha256sum motovox-arm64-v8a.apk > SHA256SUMS.txt
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "MotoVox $GITHUB_REF_NAME" \
+            --notes-from-tag motovox-arm64-v8a.apk SHA256SUMS.txt

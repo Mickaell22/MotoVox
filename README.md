@@ -9,6 +9,16 @@ Intercomunicador para moto en tiempo real. Conecta conductor y copiloto por audi
 ![C](https://img.shields.io/badge/C-00599C?style=for-the-badge&logo=c&logoColor=white)
 ![FFI](https://img.shields.io/badge/dart%3Affi-0175C2?style=for-the-badge)
 
+[![Release](https://img.shields.io/github/v/release/Mickaell22/MotoVox?style=for-the-badge&label=APK)](https://github.com/Mickaell22/MotoVox/releases/latest)
+
+---
+
+## Descargar
+
+No hace falta compilar: baja **[motovox-arm64-v8a.apk](https://github.com/Mickaell22/MotoVox/releases/latest/download/motovox-arm64-v8a.apk)** del último release e instálalo en dos teléfonos Android de 64 bits (Android 5.0+). Hay que permitir "instalar apps de origen desconocido". El `SHA256SUMS.txt` del release sirve para verificar la descarga.
+
+Los releases los publica GitHub Actions (`.github/workflows/release.yml`) al subir un tag `vX.Y.Z` anotado, que debe coincidir con la `version` del `pubspec.yaml`; las notas salen del mensaje del tag.
+
 ---
 
 ## ¿Cómo funciona?
