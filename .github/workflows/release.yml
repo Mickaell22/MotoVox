@@ -73,5 +73,8 @@ jobs:
         run: |
           cp build/app/outputs/flutter-apk/app-release.apk motovox-arm64-v8a.apk
           sha256sum motovox-arm64-v8a.apk > SHA256SUMS.txt
+          # checkout puede dejar el tag sin su anotacion: se trae explicito.
+          git fetch --force origin "refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
+          git tag -l --format='%(contents)' "$GITHUB_REF_NAME" > "$RUNNER_TEMP/notes.md"
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "MotoVox $GITHUB_REF_NAME" \
-            --notes-from-tag motovox-arm64-v8a.apk SHA256SUMS.txt
+            --notes-file "$RUNNER_TEMP/notes.md" motovox-arm64-v8a.apk SHA256SUMS.txt
